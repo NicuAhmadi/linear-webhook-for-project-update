@@ -1,22 +1,28 @@
-const { createHmac } = require('node:crypto');
+import fetch from 'node-fetch';
 
-export default async (request: Request) => {
-  const payload = await request.text();
-  const { action, data, type, createdAt } = JSON.parse(payload);
+export const handler = async (event: any) => {
+  const payload = JSON.parse(event.body);
+  const { action, data } = payload;
 
-  // Verify signature
-  const signature = createHmac("sha256", Netlify.env.get('WEBHOOK_SECRET')).update(payload).digest("hex");
+  // Forward the payload to Google Apps Script
+  const response = await fetch('https://script.google.com/macros/s/AKfycbzLFdEQtCHPpZmNS5JrgPfnlNJgM-gFAqiRIi-AO6IEmWRkFcwGm4jYYyeWhph3nec6dw/exec', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: action,
+      data: data,
+    }),
+  });
 
-  if (signature !== request.headers.get('linear-signature')) {
-    return new Response(null, { status: 400 })
+  if (!response.ok) {
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: 'Failed to send data to Google Apps Script' }),
+    };
   }
 
-  // Do something neat with the data received!
-
-  // Finally, respond with a HTTP 200 to signal all good
-  return new Response(null, { status: 200 })
-}
-
-export const config = {
-  path: "/my-linear-webhook"
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ message: 'Success' }),
+  };
 };
